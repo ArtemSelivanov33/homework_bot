@@ -124,18 +124,21 @@ def main():
             response = get_api_answer(timestamp)
             homeworks = check_response(response)
             if not homeworks:
-                logging.debug("Отсутствие в ответе новых статусов")
+                logging.debug("Отсутствие в ответе новых статусов.")
                 return
+                time.sleep(RETRY_PERIOD)
             for homework in homeworks:
                 message = parse_status(homework)
                 if message:
                     send_message(bot, message)
             timestamp = int(time.time())
+            time.sleep(RETRY_PERIOD)
 
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             logging.error(message)
             send_message(bot, message)
+            time.sleep(RETRY_PERIOD)
 
         time.sleep(RETRY_PERIOD)
 
