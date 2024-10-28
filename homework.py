@@ -82,7 +82,8 @@ def get_api_answer(timestamp):
 
     except requests.exceptions.RequestException as e:
         logging.error(f'Сетевая ошибка: {e}')
-        raise  ConnectionError(f'Ошибка API: {response.status_code}')
+        raise ConnectionError(f'Ошибка API: {response.status_code}')
+
 
 def check_response(response):
     """Проверяет ответ API на соответствие документации."""
@@ -99,7 +100,7 @@ def check_response(response):
 def parse_status(homework):
     """Извлекает статус проверки работы и формирует сообщение."""
     homework_name = homework.get('homework_name')
-    homework_status = homework.get('status') 
+    homework_status = homework.get('status')
     if homework_name is None:
         raise KeyError('Отсутствует ключ "homework_name" в домашней работе.')
     if homework_status not in HOMEWORK_VERDICTS:
