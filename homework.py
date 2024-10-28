@@ -131,13 +131,13 @@ def main():
                 if message:
                     send_message(bot, message)
             timestamp = int(time.time())
-            time.sleep(RETRY_PERIOD)
 
         except Exception as error:
             message = f'Сбой в работе программы: {error}'
             logging.error(message)
             send_message(bot, message)
-            time.sleep(RETRY_PERIOD)
+
+        time.sleep(RETRY_PERIOD)
 
 
 if __name__ == '__main__':
