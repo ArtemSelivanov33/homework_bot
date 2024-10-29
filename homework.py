@@ -125,7 +125,7 @@ def main():
             homeworks = check_response(response)
             if not homeworks:
                 logging.debug("Отсутствие в ответе новых статусов.")
-                message = f'Отсутствие в ответе новых статусов.'
+                message = 'Отсутствие в ответе новых статусов.'
                 send_message(bot, message)
                 time.sleep(RETRY_PERIOD)
             for homework in homeworks:
