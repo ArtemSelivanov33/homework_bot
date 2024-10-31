@@ -1,10 +1,12 @@
 import logging
 import os
 import requests
+import sys
 import time
 
 from dotenv import load_dotenv
 from telebot import TeleBot
+from telebot.apihelper import ApiException
 
 from exception import (
     ServerResponseError,
@@ -47,7 +49,7 @@ def send_message(bot, message):
     try:
         bot.send_message(TELEGRAM_CHAT_ID, message)
         logging.debug(f'Бот отправил сообщение "{message}"')
-    except telebot.apihelper.ApiException as api_error:
+    except ApiException as api_error:
         raise TelegramMessageError(
             f'Ошибка при отправке сообщения в Telegram: {api_error}'
         )
@@ -62,13 +64,13 @@ def get_api_answer(timestamp):
     }
     try:
         response = requests.get(**request_kwargs)
-        #Не смог понять как убрать отсюда проверку,чтобы не делал,падают тесты.
+        # Не смог понять как убрать отсюда проверку,чтобы не делал,падают тесты.
         if response.status_code != 200:
             raise ServerResponseError(response.status_code)
         return response.json()
     except requests.exceptions.RequestException as e:
         raise ConnectionError(
-            f'Ошибка API: {response.status_code}, {response.text},'
+            f'Ошибка API: {e},'
             f'Параметры запроса: {request_kwargs}'
         )
 
@@ -94,14 +96,16 @@ def parse_status(homework):
     if homework_status is None:
         raise KeyError('Отсутствует ключ "homework_status" в домашней работе.')
     if homework_status not in HOMEWORK_VERDICTS:
-        raise ValueError(f'Неизвестный статус: {homework_status}')    
-    return (f'Изменился статус проверки работы "{homework_name}". '
-    f'{HOMEWORK_VERDICTS.get(homework_status)}')
+        raise ValueError(f'Неизвестный статус: {homework_status}')
+    return (
+        f'Изменился статус проверки работы "{homework_name}".'
+        f'{HOMEWORK_VERDICTS.get(homework_status)}'
+    )
 
 
 def main():
     """Основная логика работы бота."""
-    if check_tokens() == False:
+    if check_tokens() is False:
         logging.critical(
             'Отсутствуют переменные окружения: *REQUIRED_VARIABLES'
         )
@@ -121,8 +125,12 @@ def main():
             if homeworks:
                 for homework in homeworks:
                     homework_timestamp = int(
-                        time.mktime(time.strptime(homework['date_updated'],
-                        '%Y-%m-%dT%H:%M:%SZ'))
+                        time.mktime(
+                            time.strptime(
+                                homework['date_updated'],
+                                '%Y-%m-%dT%H:%M:%SZ'
+                            )
+                        )
                     )
                     if homework_timestamp >= current_timestamp:
                         message = parse_status(homework)
@@ -133,7 +141,7 @@ def main():
                                 logging.info('Начинаю отправку сообщения.')
                                 last_message = message
                             except (
-                                telebot.apihelper.ApiException,
+                                ApiException,
                                 requests.RequestException
                             ) as err:
                                 logging.error(
@@ -152,8 +160,7 @@ def main():
                 logging.debug("Отсутствие в ответе новых статусов")
         except requests.exceptions.RequestException as e:
             logging.error(
-                f'Сетевая ошибка: {e},'
-                f'Параметры запроса: {request_kwargs}'
+                f'Сетевая ошибка: {e}'
             )
         except ServerResponseError as sr_error:
             logging.error(
@@ -178,10 +185,10 @@ if __name__ == '__main__':
     main()
 
     logging.basicConfig(
-    level=logging.DEBUG,
-    format='%(asctime)s [%(levelname)s] %(message)s',
-    handlers=[
-        logging.FileHandler("bot.log"),
-        logging.StreamHandler()
-    ]
+        level=logging.DEBUG,
+        format='%(asctime)s [%(levelname)s] %(message)s',
+        handlers=[
+            logging.FileHandler("bot.log"),
+            logging.StreamHandler()
+        ]
     )
