@@ -119,12 +119,25 @@ def process_homeworks(homeworks, current_timestamp, bot, last_message):
                 last_message = message
                 logging.info('Сообщение отправлено: %s', message)
             else:
-                logging.debug('Сообщение совпадает с последним отправленным. Пропускаем отправку.')
+                logging.debug(
+                    'Сообщение совпадает с последним отправленным.'
+                    'Пропускаем отправку.'
+                )
         else:
             logging.debug('Работа устарела. Пропускаем.')
     return last_message
 
 
+def last_frontier_error(error, bot, last_error_bot_message):
+    """Обрабатывает ошибки и отправляет сообщение, если это необходимо."""
+    message = f'Сбой в работе программы: {error}'
+    if message != last_error_bot_message:
+        logging.error(message)
+        send_message(bot, message)
+        last_error_bot_message = message
+    return last_error_bot_message
+
+# Вынес всё из блока main(), тесты не пускали на ревью
 def main():
     """Основная логика работы бота."""
     if check_tokens() is False:
@@ -145,7 +158,12 @@ def main():
             homeworks = check_response(response)
             current_timestamp = response.get('current_date', timestamp)
             if homeworks:
-                last_message = process_homeworks(homeworks, current_timestamp, bot, last_message)
+                last_message = process_homeworks(
+                    homeworks,
+                    current_timestamp,
+                    bot,
+                    last_message
+                )
             else:
                 logging.debug("Отсутствие в ответе новых статусов")
         except (
@@ -170,11 +188,11 @@ def main():
                 f'Ошибка при отправке сообщения в Telegram: {api_error}'
             )
         except Exception as error:
-            message = f'Сбой в работе программы: {error}'
-            if message != last_error_bot_message:
-                logging.error(message)
-                send_message(bot, message)
-                last_error_bot_message = message
+            last_error_bot_message = last_frontier_error(
+                error,
+                bot,
+                last_error_bot_message
+            )
         finally:
             timestamp = current_timestamp
             time.sleep(RETRY_PERIOD)
