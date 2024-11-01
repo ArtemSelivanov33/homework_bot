@@ -64,7 +64,8 @@ def get_api_answer(timestamp):
     }
     try:
         response = requests.get(**request_kwargs)
-        # Не смог понять как убрать отсюда проверку,чтобы не делал,падают тесты.
+        # Не смог понять как убрать отсюда проверку,
+        # чтобы не делал,падают тесты.
         if response.status_code != 200:
             raise ServerResponseError(response.status_code)
         return response.json()
@@ -103,6 +104,27 @@ def parse_status(homework):
     )
 
 
+def process_homeworks(homeworks, current_timestamp, bot, last_message):
+    """Обрабатывает домашние задания и отправляет сообщения."""
+    for homework in homeworks:
+        homework_timestamp = int(
+            time.mktime(
+                time.strptime(homework['date_updated'], '%Y-%m-%dT%H:%M:%SZ')
+            )
+        )
+        if homework_timestamp >= current_timestamp:
+            message = parse_status(homework)
+            if message != last_message:
+                send_message(bot, message)
+                last_message = message
+                logging.info('Сообщение отправлено: %s', message)
+            else:
+                logging.debug('Сообщение совпадает с последним отправленным. Пропускаем отправку.')
+        else:
+            logging.debug('Работа устарела. Пропускаем.')
+    return last_message
+
+
 def main():
     """Основная логика работы бота."""
     if check_tokens() is False:
@@ -123,41 +145,18 @@ def main():
             homeworks = check_response(response)
             current_timestamp = response.get('current_date', timestamp)
             if homeworks:
-                for homework in homeworks:
-                    homework_timestamp = int(
-                        time.mktime(
-                            time.strptime(
-                                homework['date_updated'],
-                                '%Y-%m-%dT%H:%M:%SZ'
-                            )
-                        )
-                    )
-                    if homework_timestamp >= current_timestamp:
-                        message = parse_status(homework)
-                        logging.info('Начинаю проверку сообщения.')
-                        if message != last_message:
-                            try:
-                                send_message(bot, message)
-                                logging.info('Начинаю отправку сообщения.')
-                                last_message = message
-                            except (
-                                ApiException,
-                                requests.RequestException
-                            ) as err:
-                                logging.error(
-                                    f'Сбой API при выполнении HTTP-запроса:'
-                                    f'{err}'
-                                )
-                                continue
-                        else:
-                            logging.debug(
-                                'Сообщение совпадает с последним отправленным.'
-                                'Пропускаем отправку.'
-                            )
-                    else:
-                        logging.debug('Работа устарела. Пропускаем.')
+                last_message = process_homeworks(homeworks, current_timestamp, bot, last_message)
             else:
                 logging.debug("Отсутствие в ответе новых статусов")
+        except (
+            ApiException,
+            requests.RequestException
+        ) as err:
+            logging.error(
+                f'Сбой API при выполнении HTTP-запроса:'
+                f'{err}'
+            )
+            continue
         except requests.exceptions.RequestException as e:
             logging.error(
                 f'Сетевая ошибка: {e}'
