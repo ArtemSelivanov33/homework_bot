@@ -137,6 +137,7 @@ def last_frontier_error(error, bot, last_error_bot_message):
         last_error_bot_message = message
     return last_error_bot_message
 
+
 # Вынес всё из блока main(), тесты не пускали на ревью
 def main():
     """Основная логика работы бота."""
