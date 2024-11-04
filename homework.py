@@ -38,9 +38,10 @@ def check_tokens():
         TELEGRAM_CHAT_ID
     )
 
-    for variables in REQUIRED_VARIABLES:
-        if variables is None:
-            return False
+    for variable in REQUIRED_VARIABLES:
+        if variable is None:
+            logging.critical("Отсутствуют необходимые переменные окружения: *REQUIRED_VARIABLES")
+            sys.exit()
     return True
 
 
@@ -64,16 +65,14 @@ def get_api_answer(timestamp):
     }
     try:
         response = requests.get(**request_kwargs)
-        # Не смог понять как убрать отсюда проверку,
-        # чтобы не делал,падают тесты.
-        if response.status_code != 200:
-            raise ServerResponseError(response.status_code)
-        return response.json()
     except requests.exceptions.RequestException as e:
         raise ConnectionError(
             f'Ошибка API: {e},'
             f'Параметры запроса: {request_kwargs}'
         )
+    if response.status_code != 200: 
+        raise ServerResponseError(response.status_code) 
+    return response.json()
 
 
 def check_response(response):
@@ -106,56 +105,51 @@ def parse_status(homework):
 
 def process_homeworks(homeworks, current_timestamp, bot, last_message):
     """Обрабатывает домашние задания и отправляет сообщения."""
-    for homework in homeworks:
-        homework_timestamp = int(
-            time.mktime(
-                time.strptime(homework['date_updated'], '%Y-%m-%dT%H:%M:%SZ')
-            )
+    homework = homeworks[0]
+    homework_timestamp = int(
+        time.mktime(
+            time.strptime(homework['date_updated'], '%Y-%m-%dT%H:%M:%SZ')
         )
-        if homework_timestamp >= current_timestamp:
-            message = parse_status(homework)
-            if message != last_message:
-                send_message(bot, message)
-                last_message = message
-                logging.info('Сообщение отправлено: %s', message)
-            else:
-                logging.debug(
-                    'Сообщение совпадает с последним отправленным.'
-                    'Пропускаем отправку.'
-                )
+    )
+    if homework_timestamp >= current_timestamp:
+        message = parse_status(homework)
+        if message != last_message:
+            send_message(bot, message)
+            last_message = message
+            logging.info('Сообщение отправлено: %s', message)
         else:
-            logging.debug('Работа устарела. Пропускаем.')
+            logging.debug(
+                'Сообщение совпадает с последним отправленным.'
+                'Пропускаем отправку.'
+            )
+    else:
+        logging.debug('Работа устарела. Пропускаем.')
     return last_message
 
 
-def last_frontier_error(error, bot, last_error_bot_message):
-    """Обрабатывает ошибки и отправляет сообщение, если это необходимо."""
+def send_except_error(error, bot, last_error_message):
+    """Отправляет последнее сообщение об ошибке, исключая дублирование."""
+    logging.error(f'Сбой в работе программы: {error}')
     message = f'Сбой в работе программы: {error}'
-    if message != last_error_bot_message:
+    if message != last_error_message:
         logging.error(message)
         send_message(bot, message)
-        last_error_bot_message = message
-    return last_error_bot_message
+        last_error_message = message
+    return last_error_message
 
 
-# Вынес всё из блока main(), тесты не пускали на ревью
 def main():
     """Основная логика работы бота."""
-    if check_tokens() is False:
-        logging.critical(
-            'Отсутствуют переменные окружения: *REQUIRED_VARIABLES'
-        )
-        message = 'Отсутствуют переменные окружения: *REQUIRED_VARIABLES'
-        sys.exit(message)
+    check_tokens()        
     bot = TeleBot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
     last_message = None
-    last_error_bot_message = None
+    last_error_message = None
 
     while True:
         try:
-            response = get_api_answer(timestamp)
             logging.info('Начали запрос к API.')
+            response = get_api_answer(timestamp)
             homeworks = check_response(response)
             current_timestamp = response.get('current_date', timestamp)
             if homeworks:
@@ -167,35 +161,20 @@ def main():
                 )
             else:
                 logging.debug("Отсутствие в ответе новых статусов")
-        except (
-            ApiException,
-            requests.RequestException
-        ) as err:
-            logging.error(
-                f'Сбой API при выполнении HTTP-запроса:'
-                f'{err}'
-            )
-            continue
-        except requests.exceptions.RequestException as e:
-            logging.error(
-                f'Сетевая ошибка: {e}'
-            )
-        except ServerResponseError as sr_error:
-            logging.error(
-                sr_error.message
-            )
         except TelegramMessageError as api_error:
             logging.error(
                 f'Ошибка при отправке сообщения в Telegram: {api_error}'
             )
         except Exception as error:
-            last_error_bot_message = last_frontier_error(
+            last_error_message = send_except_error(
                 error,
                 bot,
-                last_error_bot_message
+                last_error_message
             )
+            continue
         finally:
-            timestamp = current_timestamp
+            timestamp = int(time.time())
+            current_timestamp = response.get('current_date', timestamp)
             time.sleep(RETRY_PERIOD)
 
 
