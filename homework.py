@@ -40,7 +40,10 @@ def check_tokens():
 
     for variable in REQUIRED_VARIABLES:
         if variable is None:
-            logging.critical("Отсутствуют необходимые переменные окружения: *REQUIRED_VARIABLES")
+            logging.critical(
+                'Отсутствуют необходимые переменные окружения:'
+                ' *REQUIRED_VARIABLES'
+            )
             sys.exit()
     return True
 
@@ -70,8 +73,8 @@ def get_api_answer(timestamp):
             f'Ошибка API: {e},'
             f'Параметры запроса: {request_kwargs}'
         )
-    if response.status_code != 200: 
-        raise ServerResponseError(response.status_code) 
+    if response.status_code != 200:
+        raise ServerResponseError(response.status_code)
     return response.json()
 
 
@@ -140,7 +143,7 @@ def send_except_error(error, bot, last_error_message):
 
 def main():
     """Основная логика работы бота."""
-    check_tokens()        
+    check_tokens()
     bot = TeleBot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
     last_message = None
