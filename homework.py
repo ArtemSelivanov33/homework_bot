@@ -15,9 +15,9 @@ from exception import (
 
 load_dotenv()
 
-PRACTICUM_TOKEN = os.getenv('PRACT_TOKEN')
-TELEGRAM_TOKEN = os.getenv('TG_TOKEN')
-TELEGRAM_CHAT_ID = os.getenv('TG_CHAT_ID')
+PRACTICUM_TOKEN = os.getenv('PRACTICUM_TOKEN')
+TELEGRAM_TOKEN = os.getenv('TELEGRAM_TOKEN')
+TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
 
 RETRY_PERIOD = 600
 ENDPOINT = 'https://practicum.yandex.ru/api/user_api/homework_statuses/'
@@ -32,19 +32,21 @@ HOMEWORK_VERDICTS = {
 
 def check_tokens():
     """Проверка доступности переменных окружения."""
-    REQUIRED_VARIABLES = (
-        PRACTICUM_TOKEN,
-        TELEGRAM_TOKEN,
-        TELEGRAM_CHAT_ID
-    )
-
-    for variable in REQUIRED_VARIABLES:
-        if variable is None:
-            logging.critical(
-                'Отсутствуют необходимые переменные окружения:'
-                ' *REQUIRED_VARIABLES'
-            )
-            sys.exit()
+    REQUIRED_VARIABLES = [
+        ('Токен ЯПрактикум', PRACTICUM_TOKEN),
+        ('Токен Телеграмм', TELEGRAM_TOKEN),
+        ('Телеграмм CHAT_ID', TELEGRAM_CHAT_ID),
+    ]
+    missing_variables = [
+        f"{name}: {value}" for name, value in REQUIRED_VARIABLES
+        if value is None
+    ]
+    if missing_variables:
+        logging.critical(
+            "Отсутствуют необходимые переменные окружения: %s",
+            ', '.join(missing_variables)
+        )
+        return False
     return True
 
 
@@ -143,7 +145,8 @@ def send_except_error(error, bot, last_error_message):
 
 def main():
     """Основная логика работы бота."""
-    check_tokens()
+    if not check_tokens():
+        sys.exit()
     bot = TeleBot(token=TELEGRAM_TOKEN)
     timestamp = int(time.time())
     last_message = None
@@ -162,6 +165,7 @@ def main():
                     bot,
                     last_message
                 )
+                current_timestamp = response.get('current_date', timestamp)
             else:
                 logging.debug("Отсутствие в ответе новых статусов")
         except TelegramMessageError as api_error:
@@ -174,10 +178,7 @@ def main():
                 bot,
                 last_error_message
             )
-            continue
         finally:
-            timestamp = int(time.time())
-            current_timestamp = response.get('current_date', timestamp)
             time.sleep(RETRY_PERIOD)
 
 
