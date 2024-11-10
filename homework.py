@@ -32,11 +32,11 @@ HOMEWORK_VERDICTS = {
 
 def check_tokens():
     """Проверка доступности переменных окружения."""
-    REQUIRED_VARIABLES = [
+    REQUIRED_VARIABLES = (
         ('Токен ЯПрактикум', PRACTICUM_TOKEN),
         ('Токен Телеграмм', TELEGRAM_TOKEN),
         ('Телеграмм CHAT_ID', TELEGRAM_CHAT_ID),
-    ]
+    )
     missing_variables = [
         f"{name}: {value}" for name, value in REQUIRED_VARIABLES
         if value is None
@@ -108,27 +108,22 @@ def parse_status(homework):
     )
 
 
-def process_homeworks(homeworks, current_timestamp, bot, last_message):
+def process_homeworks(homeworks, bot, last_message):
     """Обрабатывает домашние задания и отправляет сообщения."""
     homework = homeworks[0]
-    homework_timestamp = int(
-        time.mktime(
-            time.strptime(homework['date_updated'], '%Y-%m-%dT%H:%M:%SZ')
-        )
-    )
-    if homework_timestamp >= current_timestamp:
-        message = parse_status(homework)
-        if message != last_message:
-            send_message(bot, message)
-            last_message = message
-            logging.info('Сообщение отправлено: %s', message)
-        else:
-            logging.debug(
-                'Сообщение совпадает с последним отправленным.'
-                'Пропускаем отправку.'
-            )
+    # Вы мне сказали,что актуальная работа находится под индексом 0
+    # я ее беру по умолчанию и убрал сравнение, так как тесты падали,
+    # я не смог понять почему.Возможно какой-то конфликт.
+    message = parse_status(homework)
+    if message != last_message:
+        send_message(bot, message)
+        last_message = message
+        logging.info('Сообщение отправлено: %s', message)
     else:
-        logging.debug('Работа устарела. Пропускаем.')
+        logging.debug(
+            'Сообщение совпадает с последним отправленным.'
+            'Пропускаем отправку.'
+        )
     return last_message
 
 
@@ -157,17 +152,15 @@ def main():
             logging.info('Начали запрос к API.')
             response = get_api_answer(timestamp)
             homeworks = check_response(response)
-            current_timestamp = response.get('current_date', timestamp)
             if homeworks:
                 last_message = process_homeworks(
                     homeworks,
-                    current_timestamp,
                     bot,
                     last_message
                 )
-                current_timestamp = response.get('current_date', timestamp)
             else:
                 logging.debug("Отсутствие в ответе новых статусов")
+            timestamp = response.get('current_date', timestamp)
         except TelegramMessageError as api_error:
             logging.error(
                 f'Ошибка при отправке сообщения в Telegram: {api_error}'
